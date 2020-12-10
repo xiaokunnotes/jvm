@@ -1,4 +1,4 @@
-= JDK 源码分析
+= 深入理解jvm虚拟机
 D瓜哥 <https://www.diguage.com>
 {docdate}
 :doctype: book
