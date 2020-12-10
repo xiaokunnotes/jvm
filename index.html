@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
 <link rel="stylesheet" href="assets/css/asciidoctor.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="assets/css/rouge-monokai.css">
 </head>
 <body class="book toc2 toc-left">
 <div id="header">
@@ -19,13 +20,13 @@
 <div class="details">
 <span id="author" class="author">D瓜哥</span><br>
 <span id="email" class="email"><a href="https://www.diguage.com" class="bare">https://www.diguage.com</a></span><br>
-<span id="revdate">2020-12-07</span>
+<span id="revdate">2020-12-10</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
 <li><a href="#_前言jdk_stl_源码分析计划">前言：JDK &amp; STL 源码分析计划</a></li>
-<li><a href="#_abstractcollection">1. AbstractCollection</a></li>
+<li><a href="#_第二部分_自动内存管理实践">1. 第二部分 自动内存管理实践</a></li>
 </ul>
 </div>
 </div>
@@ -424,35 +425,189 @@
 </div>
 </div>
 <div class="sect1">
-<h2 id="_abstractcollection"><a class="anchor" href="#_abstractcollection"></a>1. AbstractCollection</h2>
+<h2 id="_第二部分_自动内存管理实践"><a class="anchor" href="#_第二部分_自动内存管理实践"></a>1. 第二部分 自动内存管理实践</h2>
 <div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
+<div class="imageblock">
+<div class="content">
+<img src="./images/runing.png" alt="runing">
+</div>
+</div>
+<div class="sect2">
+<h3 id="_程序计数器program_counter_register"><a class="anchor" href="#_程序计数器program_counter_register"></a>1.1. 程序计数器（Program Counter Register）</h3>
+<div class="paragraph">
+<p>程序计数器主要存储当前线程所执行的字节码行号指示器，通过改变计数器的值来获取下一条需要执行的字节码指令。</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>首先我们要搞清楚JVM的多线程实现方式。JVM的多线程是通过CPU时间片轮转（即线程轮流切换并分配处理器执行时间）算法来实现的。也就是说，某个线程在执行过程中可能会因为时间片耗尽而被挂起，而另一个线程获取到时间片开始执行。当被挂起的线程重新获取到时间片的时候，它要想从被挂起的地方继续执行，就必须知道它上次执行到哪个位置，在JVM中，通过程序计数器来记录某个线程的字节码执行位置。因此，程序计数器是具备线程隔离的特性，也就是说，每个线程工作时都有属于自己的独立计数器。</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>特点：</p>
+</div>
+<div class="ulist">
+<ul>
 <li>
-<p>test</p>
+<p>线程隔离性,每个线程有自己的独立技术器。</p>
+</li>
+<li>
+<p>执行java方法时，计数器中记录的是正在执行的虚拟机字节码指令地址</p>
+</li>
+<li>
+<p>执行native方法时，计数器值为空。why? native方法大多是通过C实现的并未编译成需要执行的字节码指令，也就不需要存储执行指令地址了。</p>
+</li>
+<li>
+<p>jvm规范中唯一没有规定OutOfMemoryError情况的区域</p>
+</li>
+<li>
+<p>占用内存很小，可忽略不计</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_虚拟机栈vm_stack"><a class="anchor" href="#_虚拟机栈vm_stack"></a>1.2. 虚拟机栈（VM Stack）</h3>
+<div class="paragraph">
+<p>虚拟机栈描述的是Java方法执行的线程内存模型，存放的是一个方法的所有局部变量。</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>每个方法被执行的时候，虚拟机栈都会同步创建一个栈帧（Stack Frame） 用于存储局部变量表、操作数栈、动态链接、方法出口等信息。每一个方法被调用直至执行完毕的过程就对应着一个栈帧在虚拟机中从入栈到出栈的过程</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>下面我们用这段代码介绍下虚拟机栈结构及用途</p>
+</div>
+<div class="listingblock">
+<div class="title">VmStackDome.java</div>
+<div class="content">
+<pre class="rouge highlight nowrap"><code data-lang="java"><table class="linenotable"><tbody><tr><td class="linenos gl"><pre class="lineno"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="code"><pre><span class="kd">public</span> <span class="kd">class</span> <span class="nc">VmStackDome</span> <span class="o">{</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="nc">Object</span> <span class="n">obj</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Object</span><span class="o">();</span>
+
+    <span class="kd">public</span> <span class="kt">void</span> <span class="nf">methodOne</span><span class="o">(</span><span class="kt">int</span> <span class="n">i</span><span class="o">){</span>
+
+      <span class="kt">int</span> <span class="n">j</span> <span class="o">=</span> <span class="mi">1</span><span class="o">;</span>
+      <span class="kt">int</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">i</span><span class="o">+</span><span class="n">j</span><span class="o">;</span>
+      <span class="nc">Object</span> <span class="n">object</span> <span class="o">=</span> <span class="n">obj</span><span class="o">;</span>
+      <span class="kt">long</span> <span class="n">start</span> <span class="o">=</span> <span class="nc">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+      <span class="n">methodTwo</span><span class="o">();</span>
+
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kt">void</span> <span class="nf">methodTwo</span><span class="o">(){</span>
+      <span class="kt">int</span> <span class="n">k</span> <span class="o">=</span> <span class="mi">10</span><span class="o">;</span>
+      <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">printf</span><span class="o">(</span><span class="s">"k="</span><span class="o">+</span><span class="n">k</span><span class="o">);</span>
+    <span class="o">}</span>
+
+<span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre>
+</div>
+</div>
 <div class="olist loweralpha">
 <ol class="loweralpha" type="a">
 <li>
-<p>test2</p>
-<div class="olist lowerroman">
-<ol class="lowerroman" type="i">
+<p>当虚拟机要执行一个方法methodOne()时，就会有一个栈帧压入线程独享的虚拟机栈中，如下图</p>
+</li>
+</ol>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/ruzhanguocheng.png" alt="ruzhanguocheng">
+</div>
+</div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
 <li>
-<p>test3</p>
+<p>当线程开始执行这个方法时这些局部变量应该从哪里读取，又是在哪里做的运算？我们通过看这个类的反编译代码来看</p>
 </li>
 </ol>
 </div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/bianyi.png" alt="bianyi">
+</div>
+</div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
+<li>
+<p>我们直接看这个方法的执行区，可以看到在执行int j=1;时对应的执行指令是iconst_1,我们再参考Java虚拟机字节码指令表看，iconst_1的含义是将int型1推送至栈顶</p>
 </li>
 </ol>
 </div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/iconst_1.png" alt="iconst 1">
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/iconst_1-2.png" alt="iconst 1 2">
+</div>
+</div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
+<li>
+<p>第二步执行istore_2指令,指令含义：将栈顶int型数值存入第三个本地变量</p>
 </li>
 </ol>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/istore.png" alt="istore">
+</div>
+</div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
+<li>
+<p>执行iload_1指令（将第二个int型本地变量推送至栈顶）、iload_2（将第三个int型本地变量推送至栈顶）假设 i=10;</p>
+</li>
+</ol>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/iload.png" alt="iload">
+</div>
+</div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
+<li>
+<p>执行iadd指令(将栈顶两int型数值相加并将结果压入栈顶)、执行istore_3（将栈顶int型数值存入第四个本地变量）</p>
+</li>
+</ol>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/iadd.png" alt="iadd">
+</div>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-12-07 14:01:44 UTC
+Last updated 2020-12-10 12:09:34 UTC
 </div>
 </div>
 </body>
