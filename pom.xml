@@ -219,7 +219,7 @@
             <require>asciidoctor-diagram</require>
           </requires>
           <attributes>
-            <sourcedir>${project.build.sourceDirectory}/com/diguage/truman</sourcedir>
+            <sourcedir>${project.build.sourceDirectory}/com/jinkun/jvm/notes</sourcedir>
             <basedir>${project.basedir}</basedir>
             <source-highlighter>rouge</source-highlighter>
             <rouge-linenums-mode>table</rouge-linenums-mode>
