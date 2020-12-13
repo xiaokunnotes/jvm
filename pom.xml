@@ -5,12 +5,10 @@
                       http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.diguage</groupId>
-  <artifactId>truman</artifactId>
+  <groupId>com.xiaokun.notes</groupId>
+  <artifactId>jvm</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>JVM Notes</name>
-  <description>truman 这个名来源于《楚门的世界 The Truman Show》，取义走过 API 的墙，看到"外面的"真实的世界。</description>
-  <url>https://www.diguage.com/</url>
 
   <properties>
     <jol.version>0.10</jol.version>

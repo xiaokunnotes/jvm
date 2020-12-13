@@ -1,5 +1,4 @@
-= JDK 源码分析
-D瓜哥 <https://www.diguage.com>
+= 深入理解JVM虚拟机
 {docdate}
 :doctype: book
 :creator: {author}
@@ -14,9 +13,11 @@ include::preface.adoc[leveloffset=+1]
 
 :sectnums:
 
-include::memoryManage.adoc[leveloffset=+1]
+include::momoryManage/memoryExplore.adoc[leveloffset=+1]
 
+include::momoryManage/memoryStructure.adoc[leveloffset=+1]
 
+include::momoryManage/uselessObject.adoc[leveloffset=+1]
 
 
 
