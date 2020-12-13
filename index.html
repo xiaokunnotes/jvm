@@ -6,9 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="generator" content="Asciidoctor 2.0.12">
 <meta name="keywords" content="Java,JDK,Java source,Collection,ArrayList,Map,List,HashMap,ArrayDeque,Deque,Set,HashSet,LinkedList,Queue,TreeMap,TreeSet,Vector,Stack">
-<meta name="author" content="D瓜哥">
+<meta name="author" content="2020-12-13">
 <meta name="copyright" content="Apache-2.0">
-<title>JDK 源码分析</title>
+<title>深入理解JVM虚拟机</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
 <link rel="stylesheet" href="assets/css/asciidoctor.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -16,411 +16,33 @@
 </head>
 <body class="book toc2 toc-left">
 <div id="header">
-<h1>JDK 源码分析</h1>
+<h1>深入理解JVM虚拟机</h1>
 <div class="details">
-<span id="author" class="author">D瓜哥</span><br>
-<span id="email" class="email"><a href="https://www.diguage.com" class="bare">https://www.diguage.com</a></span><br>
-<span id="revdate">2020-12-10</span>
+<span id="author" class="author">2020-12-13</span><br>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#_前言jdk_stl_源码分析计划">前言：JDK &amp; STL 源码分析计划</a></li>
+<li><a href="#_前言">前言</a></li>
 <li><a href="#_第二部分_自动内存管理实践">1. 第二部分 自动内存管理实践</a></li>
+<li><a href="#_第二部分_虚拟机对象探秘">2. 第二部分 虚拟机对象探秘</a></li>
+<li><a href="#_第三部分_如何确定对象是存活还是死亡">3. 第三部分 如何确定对象是存活还是死亡</a></li>
 </ul>
 </div>
 </div>
 <div id="content">
 <div class="sect1">
-<h2 id="_前言jdk_stl_源码分析计划"><a class="anchor" href="#_前言jdk_stl_源码分析计划"></a>前言：JDK &amp; STL 源码分析计划</h2>
+<h2 id="_前言"><a class="anchor" href="#_前言"></a>前言</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>为了学好数据结构以及相关算法，同时也为了更好地理解 JDK 的底层实现，计划对 JDK 集合类的源码做一个系统的阅读分析。</p>
+<p>为了更好的理解jvm运行机制，在工作上每每写完一个功能的代码后再做一步Jvm的性能调优，就像每次执行代码规范检查一样。
+会让你的系统更健壮。</p>
 </div>
 <div class="paragraph">
-<p>欢迎随时提交 PR 或 Issue。建了一个 Gitter 聊天室，点击图标加入： <a href="https://gitter.im/source-analysis/community?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge"><span class="image"><img src="https://badges.gitter.im/source-analysis/community.svg" alt="community"></span></a>。</p>
+<p>整体内容算是学习这本《深入理解JVM虚拟机》的阅读笔记，所以整个目录结构也是跟这个书保持了一致，相信一切都是最好的安排</p>
 </div>
 <div class="paragraph">
-<p>浏览请点击： <a href="https://diguage.github.io/jdk-source-analysis/">JDK 源码分析</a>。</p>
-</div>
-<div class="admonitionblock warning">
-<table>
-<tr>
-<td class="icon">
-<i class="fa icon-warning" title="Warning"></i>
-</td>
-<td class="content">
-本文档基于 <strong>OpenJDK 11.0.6 2020-01-14 LTS</strong> 的代码开展分析，请 PR 的小伙伴使用相同的 JDK。谢谢！
-</td>
-</tr>
-</table>
-</div>
-<div class="sect2">
-<h3 id="_友情支持"><a class="anchor" href="#_友情支持"></a>友情支持</h3>
-<div class="paragraph">
-<p>如果您觉得这个笔记对您有所帮助，看在D瓜哥码字的辛苦上，请友情支持一下，D瓜哥感激不尽，😜</p>
-</div>
-<table class="tableblock frame-none grid-all stretch">
-<colgroup>
-<col style="width: 50%;">
-<col style="width: 50%;">
-</colgroup>
-<tbody>
-<tr>
-<td class="tableblock halign-center valign-top"><p class="tableblock"><span class="image"><img src="./images/alipay.png" alt="支付宝" width="45%" title="支付宝"></span></p></td>
-<td class="tableblock halign-center valign-top"><p class="tableblock"><span class="image"><img src="./images/wxpay.png" alt="微信" width="45%" title="微信"></span></p></td>
-</tr>
-</tbody>
-</table>
-<div class="admonitionblock tip">
-<table>
-<tr>
-<td class="icon">
-<i class="fa icon-tip" title="Tip"></i>
-</td>
-<td class="content">
-想要联系方式的小伙伴，欢迎提交 Issue 留言。D瓜哥还建了一个 Gitter 聊天室，点击图标加入： <a href="https://gitter.im/source-analysis/community?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge"><span class="image"><img src="https://badges.gitter.im/source-analysis/community.svg" alt="community"></span></a>，加入即可留言。（PS：留言不保证回复的时效性）
-</td>
-</tr>
-</table>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_官网及版本库"><a class="anchor" href="#_官网及版本库"></a>官网及版本库</h3>
-<div class="paragraph">
-<p>本文档的版本库托管在 Github 上，另外单独发布。</p>
-</div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1">“地瓜哥”博客网</dt>
-<dd>
-<p><a href="https://www.diguage.com/" class="bare" target="_blank" rel="noopener">https://www.diguage.com/</a> 。D瓜哥的个人博客。欢迎光临，不过，内容很杂乱，请见谅。不见谅，你来打我啊，😂😂</p>
-</dd>
-<dt class="hdlist1">本文档官网</dt>
-<dd>
-<p><a href="https://diguage.github.io/jdk-source-analysis/" class="bare" target="_blank" rel="noopener">https://diguage.github.io/jdk-source-analysis/</a> 。为了方便阅读，这里展示了处理好的文档。阅读请点击这个网址。</p>
-</dd>
-<dt class="hdlist1">本文档版本库</dt>
-<dd>
-<p><a href="https://github.com/diguage/jdk-source-analysis" class="bare" target="_blank" rel="noopener">https://github.com/diguage/jdk-source-analysis</a> 。欢迎大家发送 PR。</p>
-</dd>
-</dl>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_总体思路"><a class="anchor" href="#_总体思路"></a>总体思路</h3>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>学习基本的数据结构认识。兵马未动粮草先行。先把基础理论搞清楚。</p>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
-<li>
-<p>学Java的，可以从下面两本书中选一本：</p>
-<div class="olist lowerroman">
-<ol class="lowerroman" type="i">
-<li>
-<p><a href="https://book.douban.com/subject/26745780/">数据结构与算法分析</a>&#8201;&#8212;&#8201;这本书的优点在于和 Java JDK 的集合类很贴近。</p>
-</li>
-<li>
-<p><a href="https://book.douban.com/subject/19952400/">算法（第4版）</a>&#8201;&#8212;&#8201;这本书胜在图很多。</p>
-</li>
-</ol>
-</div>
-</li>
-<li>
-<p>学 C/C++ 的，可以看下面这套书：</p>
-<div class="olist lowerroman">
-<ol class="lowerroman" type="i">
-<li>
-<p><a href="https://book.douban.com/subject/4065258/">算法：C语言实现 (第1～4部分)</a></p>
-</li>
-<li>
-<p><a href="https://book.douban.com/subject/4191525/">算法：C语言实现 （第5部分）</a></p>
-</li>
-</ol>
-</div>
-</li>
-</ol>
-</div>
-</li>
-<li>
-<p>自己实现一遍基本的数据结构；</p>
-</li>
-<li>
-<p>阅读 JDK 或 STL 源码，做学习笔记。</p>
-<div class="admonitionblock tip">
-<table>
-<tr>
-<td class="icon">
-<i class="fa icon-tip" title="Tip"></i>
-</td>
-<td class="content">
-对比一下自己的实现和这些经典代码的实现，总结自己差距，提高自己的编码能力。
-</td>
-</tr>
-</table>
-</div>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
-<li>
-<p><a href="https://book.douban.com/subject/1110934/">STL源码剖析 </a>&#8201;&#8212;&#8201;阅读源码时，建议参考一下本书的内容。</p>
-</li>
-<li>
-<p>建议把网上的源码分析笔记都看一看，取长补短，补充自己的分析。</p>
-</li>
-<li>
-<p>建议把网上相关面试题也看一看，检验自己的学习成果。</p>
-</li>
-</ol>
-</div>
-</li>
-<li>
-<p>相关联的 LeetCode 上的题都刷掉。</p>
-</li>
-</ol>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<i class="fa icon-note" title="Note"></i>
-</td>
-<td class="content">
-<div class="paragraph">
-<p>还有两个想法：</p>
-</div>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>可以把 Redis 的实现也过一下，Redis 实现也有很多不错的思路。毕竟 Redis 是目前最常用的缓存解决方案。</p>
-</li>
-<li>
-<p>Java 中有很多针对集合类做扩展的库，可以一并学了，这样就能更清楚了解 Java JDK 实现的不足，开阔自己的眼界：</p>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
-<li>
-<p><a href="https://github.com/google/guava">google/guava: Google core libraries for Java</a></p>
-</li>
-<li>
-<p><a href="https://commons.apache.org/proper/commons-collections/">Apache Commons Collections</a></p>
-</li>
-<li>
-<p><a href="https://www.eclipse.org/collections/">Eclipse Collections - Features you want with the collections you need.</a></p>
-</li>
-</ol>
-</div>
-</li>
-</ol>
-</div>
-</td>
-</tr>
-</table>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_jdk_集合类"><a class="anchor" href="#_jdk_集合类"></a>JDK 集合类</h3>
-<div class="dlist">
-<dl>
-<dt class="hdlist1"><strong>Base + Iterator</strong></dt>
-<dd>
-<p>代码总行数： 103 + 135 + 302 + 195 + 838 + 127 + 734 + 480 = 2914 行，预计 5 个小时。</p>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><code>java.lang.Iterable</code></p>
-</li>
-<li>
-<p><code>java.util.Iterator</code></p>
-</li>
-<li>
-<p><code>java.util.PrimitiveIterator</code></p>
-</li>
-<li>
-<p><code>java.util.ListIterator</code></p>
-</li>
-<li>
-<p><code>java.util.Spliterator</code></p>
-</li>
-<li>
-<p><code>java.util.Enumeration</code></p>
-</li>
-<li>
-<p><code>java.util.Collection</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractCollection</code></p>
-</li>
-</ol>
-</div>
-</dd>
-<dt class="hdlist1"><strong>List</strong></dt>
-<dd>
-<p>代码总行数： 1063 + 942 + 253 + 1266 + 1509 + 141 + 1759 = 6933 行，预计 12 个小时。</p>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><code>java.util.List</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractList</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractSequentialList</code></p>
-</li>
-<li>
-<p><code>java.util.LinkedList</code></p>
-</li>
-<li>
-<p><code>java.util.Vector</code></p>
-</li>
-<li>
-<p><code>java.util.Stack</code></p>
-</li>
-<li>
-<p><code>java.util.ArrayList</code></p>
-</li>
-</ol>
-</div>
-</dd>
-<dt class="hdlist1"><strong>Queue</strong></dt>
-<dd>
-<p>代码总行数： 212 + 616 + 192 + 1233 + 987 = 3240 行，预计 6 个小时。</p>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><code>java.util.Queue</code></p>
-</li>
-<li>
-<p><code>java.util.Deque</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractQueue</code></p>
-</li>
-<li>
-<p><code>java.util.ArrayDeque</code></p>
-</li>
-<li>
-<p><code>java.util.PriorityQueue</code></p>
-</li>
-</ol>
-</div>
-</dd>
-<dt class="hdlist1"><strong>Set</strong></dt>
-<dd>
-<p>代码总行数： 732 + 186 + 264 + 491 + 323 + 361 + 560 + 195 + 1395 = 4507 行，预计 8 个小时。</p>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><code>java.util.Set</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractSet</code></p>
-</li>
-<li>
-<p><code>java.util.SortedSet</code></p>
-</li>
-<li>
-<p><code>java.util.EnumSet</code></p>
-</li>
-<li>
-<p><code>java.util.NavigableSet</code></p>
-</li>
-<li>
-<p><code>java.util.HashSet</code></p>
-</li>
-<li>
-<p><code>java.util.TreeSet</code></p>
-</li>
-<li>
-<p><code>java.util.LinkedHashSet</code></p>
-</li>
-<li>
-<p><code>java.util.BitSet</code></p>
-</li>
-</ol>
-</div>
-</dd>
-</dl>
-</div>
-<div class="imageblock">
-<div class="content">
-<img src="./images/java.util.Collection.png" alt="java.util.Collection">
-</div>
-</div>
-<div class="dlist">
-<dl>
-<dt class="hdlist1"><strong>Map</strong></dt>
-<dd>
-<p>代码总行数： 1687 + 284 + 424 + 857 + 3012 + 1339 + 812 + 1600 + 756 + 2444 + 155 + 1521 = 14891 行，预计 28 个小时。</p>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p><code>java.util.Map</code></p>
-</li>
-<li>
-<p><code>java.util.SortedMap</code></p>
-</li>
-<li>
-<p><code>java.util.NavigableMap</code></p>
-</li>
-<li>
-<p><code>java.util.AbstractMap</code></p>
-</li>
-<li>
-<p><code>java.util.TreeMap</code></p>
-</li>
-<li>
-<p><code>java.util.WeakHashMap</code></p>
-</li>
-<li>
-<p><code>java.util.EnumMap</code></p>
-</li>
-<li>
-<p><code>java.util.IdentityHashMap</code></p>
-</li>
-<li>
-<p><code>java.util.LinkedHashMap</code></p>
-</li>
-<li>
-<p><code>java.util.HashMap</code></p>
-</li>
-<li>
-<p><code>java.util.Dictionary</code></p>
-</li>
-<li>
-<p><code>java.util.Hashtable</code></p>
-</li>
-</ol>
-</div>
-</dd>
-</dl>
-</div>
-<div class="imageblock">
-<div class="content">
-<img src="./images/java.util.Map.png" alt="java.util.Map">
-</div>
-</div>
-<div class="paragraph">
-<p>来张总体结构图：</p>
-</div>
-<div class="imageblock">
-<div class="content">
-<img src="./images/jdk-collection-classes.png" alt="jdk collection classes">
-</div>
-</div>
-<div class="admonitionblock tip">
-<table>
-<tr>
-<td class="icon">
-<i class="fa icon-tip" title="Tip"></i>
-</td>
-<td class="content">
-这里没有包含并发相关的集合类。这块内容放到并发中一起搞。
-</td>
-</tr>
-</table>
-</div>
+<p>欢迎指出日志中不足的地方，包含错误或者描述不清的地方。</p>
 </div>
 </div>
 </div>
@@ -524,8 +146,8 @@
 </pre></td></tr></tbody></table></code></pre>
 </div>
 </div>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
+<div class="olist arabic">
+<ol class="arabic">
 <li>
 <p>当虚拟机要执行一个方法methodOne()时，就会有一个栈帧压入线程独享的虚拟机栈中，如下图</p>
 </li>
@@ -536,8 +158,8 @@
 <img src="./images/ruzhanguocheng.png" alt="ruzhanguocheng">
 </div>
 </div>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
+<div class="olist arabic">
+<ol class="arabic">
 <li>
 <p>当线程开始执行这个方法时这些局部变量应该从哪里读取，又是在哪里做的运算？我们通过看这个类的反编译代码来看</p>
 </li>
@@ -568,7 +190,7 @@
 <div class="olist loweralpha">
 <ol class="loweralpha" type="a">
 <li>
-<p>第二步执行istore_2指令,指令含义：将栈顶int型数值存入第三个本地变量</p>
+<p>执行istore_2指令,指令含义：将栈顶int型数值存入第三个本地变量</p>
 </li>
 </ol>
 </div>
@@ -601,13 +223,314 @@
 <img src="./images/iadd.png" alt="iadd">
 </div>
 </div>
+<div class="olist loweralpha">
+<ol class="loweralpha" type="a">
+<li>
+<p>接下来执行istore_3指令（将栈顶int型数值存入第四个本地变量）</p>
+</li>
+<li>
+<p>接下来执行getstatic指令（获取指定类的静态域, 并将其压入栈顶）</p>
+</li>
+<li>
+<p>思考一个问题，执行字节码指令是哪个组件在执行？</p>
+<div class="olist lowerroman">
+<ol class="lowerroman" type="i">
+<li>
+<p>答案是：执行引擎，它负责执行虚拟机的字节码，现代虚拟机为了提高执行效率，会使用即时编译(just in time)技术将方法编译成机器码后再执行。</p>
+</li>
+<li>
+<p>Java HotSpot Client VM(-client)，为在客户端环境中减少启动时间而优化的执行引擎；本地应用开发使用。（如：eclipse）</p>
+</li>
+<li>
+<p>Java HotSpot Server VM(-server)，为在服务器环境中最大化程序执行速度而设计的执行引擎。应用在服务端程序。（如：tomcat）</p>
+</li>
+<li>
+<p>Java HotSpot Client模式和Server模式的区别</p>
+<div class="olist upperalpha">
+<ol class="upperalpha" type="A">
+<li>
+<p>当虚拟机运行在-client模式的时候,使用的是一个代号为C1的轻量级编译器, 而-server模式启动的虚拟机采用相对重量级,代号为C2的编译器. C2比C1编译器编译的相对彻底,服务起来之后,性能更高。JDK安装目录/jre/lib/（x86、i386、amd32、amd64）/jvm.cfg文件中的内容，-server和-client哪一个配置在上，执行引擎就是哪一个。如果是JDK1.5版本且是64位系统应用时，-client无效。在部分JDK1.6版本和后续的JDK版本(64位系统)中，-client参数已经不起作用了，Server模式成为唯一。</p>
+</li>
+</ol>
+</div>
+</li>
+</ol>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_本地方法栈native_method_stacks"><a class="anchor" href="#_本地方法栈native_method_stacks"></a>1.3. 本地方法栈（Native Method Stacks）</h3>
+<div class="paragraph">
+<p>与虚拟机所发挥的作用是非常相似的，其区别是虚拟机为本地Java方法执行字节码服务，本地方法栈为native方法执行字节码服务</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/nativeMethod.png" alt="nativeMethod">
+</div>
+</div>
+<div class="paragraph">
+<p>该线程首先调用了两个Java方法，而第二个Java方法又调用了一个本地方法，这样导致虚拟机使用了一个本地方法栈。假设这是一个C语言栈，其间有两个C函数，第一个C函数被第二个Java方法当做本地方法调用，而这个C函数又调用了第二个C函数。之后第二个C函数又通过本地方法接口回调了一个Java方法（第三个Java方法），最终这个Java方法又调用了一个Java方法</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_堆heap"><a class="anchor" href="#_堆heap"></a>1.4. 堆（Heap）</h3>
+<div class="paragraph">
+<p>此内存区域唯一目的就是存放对象实例，Java世界里几乎所有的对象的实例都在这里分配内存。</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Java虚拟机根据对象存活的周期不同，把堆内存划分为几块，一般分为新生代、老年代和永久代（对HotSpot虚拟机而言），这就是JVM的内存分代策略。
+   堆内存是虚拟机管理的内存中最大的一块，也是垃圾回收最频繁的一块区域，我们程序所有的对象实例都存放在堆内存中。给堆内存分代是为了提高对象内存分配和垃圾回收的效率。试想一下，如果堆内存没有区域划分，所有的新创建的对象和生命周期很长的对象放在一起，随着程序的执行，堆内存需要频繁进行垃圾收集，而每次回收都要遍历所有的对象，遍历这些对象所花费的时间代价是巨大的，会严重影响我们的GC效率。
+   有了内存分代，情况就不同了，新创建的对象会在新生代中分配内存，经过多次回收仍然存活下来的对象存放在老年代中，静态属性、类信息等存放在永久代中，新生代中的对象存活时间短，只需要在新生代区域中频繁进行GC，老年代中对象生命周期长，内存回收的频率相对较低，不需要频繁进行回收，永久代中回收效果太差，一般不进行垃圾回收，还可以根据不同年代的特点采用合适的垃圾收集算法。分代收集大大提升了收集效率，这些都是内存分代带来的好处。
+   当前主流的Java堆都是可扩展的，通过-Xmx和-Xms设定的，如果堆中没有内存完成实例分配也无法再扩展时，jvm就会抛出OutOfMemoryError异常</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>特点</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>线程共享的一块区域</p>
+</li>
+<li>
+<p>可以划分出多个线程私有的分配缓冲区（Thread Local Allocation Buffer，TLAB）已提升分配对象时的效率</p>
+</li>
+<li>
+<p>堆可以处于物理上不连续的区域，但逻辑上是连续的。</p>
+</li>
+</ul>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/neicunfendai.png" alt="neicunfendai">
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_方法区method_area"><a class="anchor" href="#_方法区method_area"></a>1.5. 方法区（Method Area）</h3>
+<div class="paragraph">
+<p>它用于存储已被虚拟机加载的类型信息(class)、常量、静态变量、即时编译后的代码缓存等数据。
+jdk1.8之后元空间实现了方法区，使用内存区域是本地内存。</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>方法区 ≠ 永久代/元空间。 方法区只是一种逻辑上的概念，是一中规范，而永久代/元空间是实现层面的东西，指物理上的一块空间。元空间并不在虚拟机中，而是使用本机内存，元空间大小仅受本地内存限制。</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>特点</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>线程共享的一块区域</p>
+</li>
+<li>
+<p>jdk8之后实现层是元空间，不属于虚拟机，直接占用本机内存。</p>
+</li>
+<li>
+<p>jdk7叫永久代，已经把原本放在永久代的字符串常量池、静态变量移出，</p>
+</li>
+<li>
+<p>jdk6永久代全部属于堆空间</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_运行时常量池runtime_constant_pool"><a class="anchor" href="#_运行时常量池runtime_constant_pool"></a>1.6. 运行时常量池（Runtime Constant Pool）</h3>
+<div class="paragraph">
+<p>存储常量池表&#8212;&#8203;编译期生成的各种字面量与符号引用。这部分内容将在类加载后存放到方法区的运行时常量池中。</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/yunxingshichangliangchi.png" alt="yunxingshichangliangchi">
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_第二部分_虚拟机对象探秘"><a class="anchor" href="#_第二部分_虚拟机对象探秘"></a>2. 第二部分 虚拟机对象探秘</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_对象的创建"><a class="anchor" href="#_对象的创建"></a>2.1. 对象的创建</h3>
+<div class="paragraph">
+<p>当Java虚拟机遇到一条字节码new指令时，首先将去检查这个指令的参数是否能在常量池中定位到
+一个类的符号引用，并且检查这个符号引用代表的类是否已被加载、解析和初始化过。如果没有，那
+必须先执行相应的类加载过程，后面还会详细的探讨这部分细节。</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_对象的内存布局"><a class="anchor" href="#_对象的内存布局"></a>2.2. 对象的内存布局</h3>
+<div class="paragraph">
+<p>对象在堆内存中的存储布局可以划分为三个部分：对象头（Header）、实例
+数据（Instance Data）和对齐填充（Padding）。</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_对象的访问定位"><a class="anchor" href="#_对象的访问定位"></a>2.3. 对象的访问定位</h3>
+<div class="paragraph">
+<p>创建对象自然是为了后续使用该对象，我们的Java程序会通过栈上的reference数据来操作堆上的具
+体对象。由于reference类型在《Java虚拟机规范》里面只规定了它是一个指向对象的引用，并没有定义
+这个引用应该通过什么方式去定位、访问到堆中对象的具体位置，所以对象访问方式也是由虚拟机实
+现而定的，主流的访问方式主要有使用句柄和直接指针两种</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_第三部分_如何确定对象是存活还是死亡"><a class="anchor" href="#_第三部分_如何确定对象是存活还是死亡"></a>3. 第三部分 如何确定对象是存活还是死亡</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>前面了解了Java内存运行时区域的各个部分，其中程序计数器、虚拟机栈、本地方法栈3个区域随线程而生，随线程而灭，栈
+中的栈帧随着方法的进入和退出而有条不紊地执行着出栈和入栈操作。每一个栈帧中分配多少内存基
+本上是在类结构确定下来时就已知的，因此这几个区域的内存分配和回收都具备确定性，
+在这几个区域内就不需要过多考虑如何回收的问题，当方法结束或者线程结束时，内存自然就跟随着
+回收了。</p>
+</div>
+<div class="paragraph">
+<p>但是`堆` 和`方法区`则有着很显著的不确定性：一个接口的多个实现类需要的内存可能不一样，一个方法所执行的不同条件，
+只有处于运行期我们才能知道程序究竟会创建哪些对象，这部分内存的分配和回收是动态的。</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1">说起垃圾收集我们需要考虑三个问题</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>哪些内存需要回收？</p>
+</li>
+<li>
+<p>什么时候回收？</p>
+</li>
+<li>
+<p>如何回收？</p>
+</li>
+</ol>
+</div>
+</dd>
+</dl>
+</div>
+<div class="sect2">
+<h3 id="_引用计算算法reference_counting"><a class="anchor" href="#_引用计算算法reference_counting"></a>3.1. 引用计算算法（Reference Counting）</h3>
+<div class="paragraph">
+<p>对每个对象的引用进行计数，每当有一个地方引用它时计数器 +1、引用失效则 -1，引用的计数放到对象头中，大于 0 的对象被认为是存活对象。
+在Java领域，至少主流的Java虚拟机里面都没有选用引用计数算法来管理内存，主要原因是，这个看似简单的算法有很多例外情况要考虑，必须要配合大量额外处理才能保证正确地工作，譬如单纯的引用计数就很难解决对象之间相互循环引用的问题。
+循环引用的问题可通过 Recycler 算法解决，但是在多线程环境下，引用计数变更也要进行昂贵的同步操作，性能较低，早期的编程语言会采用此算法。</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_可达性分析reachability_analysis"><a class="anchor" href="#_可达性分析reachability_analysis"></a>3.2. 可达性分析（Reachability Analysis）</h3>
+<div class="paragraph">
+<p>这个算法的基本思路就是通过
+一系列称为“GC Roots”的根对象作为起始节点集，从这些节点开始，根据引用关系向下搜索，搜索过
+程所走过的路径称为“引用链”（Reference Chain），如果某个对象到GC Roots间没有任何引用链相连，
+或者用图论的话来说就是从GC Roots到这个对象不可达时，则证明此对象是不可能再被使用的</p>
+</div>
+<div class="paragraph">
+<p>如图下图所示，对象object 5、object 6、object 7虽然互有关联，但是它们到GC Roots是不可达的，
+因此它们将会被判定为可回收的对象。</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/roots.png" alt="roots">
+</div>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1">在Java技术体系里面，固定可作为GC Roots的对象包括以下几种</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>在虚拟机栈（栈帧中的本地变量表）中引用的对象，譬如各个线程被调用的方法堆栈中使用到的
+参数、局部变量、临时变量等。</p>
+</li>
+<li>
+<p>在方法区中类静态属性引用的对象，譬如Java类的引用类型静态变量。</p>
+</li>
+<li>
+<p>在方法区中常量引用的对象，譬如字符串常量池（String Table）里的引用。</p>
+</li>
+<li>
+<p>在本地方法栈中JNI（即通常所说的Native方法）引用的对象。</p>
+</li>
+<li>
+<p>Java虚拟机内部的引用，如基本数据类型对应的Class对象，一些常驻的异常对象（比如
+NullPointExcepiton、OutOfMemoryError）等，还有系统类加载器。</p>
+</li>
+<li>
+<p>所有被同步锁（synchronized关键字）持有的对象。</p>
+</li>
+<li>
+<p>反映Java虚拟机内部情况的JMXBean、JVMTI中注册的回调、本地代码缓存等。</p>
+</li>
+</ol>
+</div>
+</dd>
+<dt class="hdlist1">在可达性分析算法中判定为不可达的对象，也不是“非死不可”的，这时候它们暂时还处于“缓刑”阶段。要真正宣告一个对象死亡，至少要经历两次标记过程</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>对象在进行可达性分析后发现没有与GC Roots相连接的引用链，那它将会被第一次标记,</p>
+</li>
+<li>
+<p>判断是否需要筛选，筛选的条件是此对象是否有必要执行finalize()方法。假如对象没有覆盖finalize()方法，或者finalize()方法已经被虚拟机调用
+过，那么虚拟机将这两种情况都视为“没有必要执行”。翻译成代码：</p>
+<div class="literalblock">
+<div class="content">
+<pre> ----
+if(对象没有覆盖finalize()方法 || finalize()方法已经被虚拟机调用过){
+     //没有必要执行finalize();
+}else{
+    //对象进入 F-Queue......
+}
+ ----</pre>
+</div>
+</div>
+</li>
+<li>
+<p>如果这个对象被判定为有必要执行finalize()方法，那么该对象将会被放置在一个名为F-Queue队列中，
+然后虚拟机自动建立低调度优先级的Finalizer线程去执行他们的finalize()方法。（触发其开始运行，但并不承诺一定会等待它运行结束，如果某个对象的finalize()方法执行缓慢，或者更极端地发生了死循环，将很可能导
+致F-Queue队列中的其他对象永久处于等待，甚至导致整个内存回收子系统的崩溃）</p>
+</li>
+<li>
+<p>第二次标记：收集器将对F-Queue中的对象进行第二次小规模的标记。如果对
+象要在finalize()中成功拯救自己——只要重新与引用链上的任何一个对象建立关联即可，譬如把自己
+（this关键字）赋值给某个类变量或者对象的成员变量，那在第二次标记时它将被移出“即将回收”的集
+合；如果对象这时候还没有逃脱，那基本上它就真的要被回收了。</p>
+</li>
+</ol>
+</div>
+</dd>
+</dl>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="java"><span class="nc">Unresolved</span> <span class="n">directive</span> <span class="n">in</span> <span class="n">momoryManage</span><span class="o">/</span><span class="n">uselessObject</span><span class="o">.</span><span class="na">adoc</span> <span class="o">-</span> <span class="nl">include:</span><span class="o">:/</span><span class="n">home</span><span class="o">/</span><span class="n">runner</span><span class="o">/</span><span class="n">work</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">java</span><span class="o">/</span><span class="n">com</span><span class="o">/</span><span class="n">diguage</span><span class="o">/</span><span class="n">truman</span><span class="o">/</span><span class="n">com</span><span class="o">/</span><span class="n">jinkun</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">notes</span><span class="o">/</span><span class="nc">FinalizeEscapeGC</span><span class="o">.</span><span class="na">java</span><span class="o">[]</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>运行结果：
+finalize method executed!
+yes, i am still alive :
+no, i am dead :(</pre>
+</div>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-12-10 12:09:34 UTC
+Last updated 2020-12-13 15:00:40 UTC
 </div>
 </div>
 </body>

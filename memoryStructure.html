@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Asciidoctor 2.0.12">
+<title>第二部分 虚拟机对象探秘</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
+<link rel="stylesheet" href="assets/css/asciidoctor.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body class="book toc2 toc-left">
+<div id="header">
+<h1>第二部分 虚拟机对象探秘</h1>
+<div id="toc" class="toc2">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_对象的创建">1. 对象的创建</a></li>
+<li><a href="#_对象的内存布局">2. 对象的内存布局</a></li>
+<li><a href="#_对象的访问定位">3. 对象的访问定位</a></li>
+</ul>
+</div>
+</div>
+<div id="content">
+<div class="sect1">
+<h2 id="_对象的创建"><a class="anchor" href="#_对象的创建"></a>1. 对象的创建</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>当Java虚拟机遇到一条字节码new指令时，首先将去检查这个指令的参数是否能在常量池中定位到
+一个类的符号引用，并且检查这个符号引用代表的类是否已被加载、解析和初始化过。如果没有，那
+必须先执行相应的类加载过程，后面还会详细的探讨这部分细节。</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_对象的内存布局"><a class="anchor" href="#_对象的内存布局"></a>2. 对象的内存布局</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>对象在堆内存中的存储布局可以划分为三个部分：对象头（Header）、实例
+数据（Instance Data）和对齐填充（Padding）。</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_对象的访问定位"><a class="anchor" href="#_对象的访问定位"></a>3. 对象的访问定位</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>创建对象自然是为了后续使用该对象，我们的Java程序会通过栈上的reference数据来操作堆上的具
+体对象。由于reference类型在《Java虚拟机规范》里面只规定了它是一个指向对象的引用，并没有定义
+这个引用应该通过什么方式去定位、访问到堆中对象的具体位置，所以对象访问方式也是由虚拟机实
+现而定的，主流的访问方式主要有使用句柄和直接指针两种</p>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2020-12-13 15:00:40 UTC
+</div>
+</div>
+</body>
+</html>

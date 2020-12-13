@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Asciidoctor 2.0.12">
+<title>第三部分 如何确定对象是存活还是死亡</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
+<link rel="stylesheet" href="assets/css/asciidoctor.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="assets/css/rouge-monokai.css">
+</head>
+<body class="book toc2 toc-left">
+<div id="header">
+<h1>第三部分 如何确定对象是存活还是死亡</h1>
+<div id="toc" class="toc2">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#_引用计算算法reference_counting">1. 引用计算算法（Reference Counting）</a></li>
+<li><a href="#_可达性分析reachability_analysis">2. 可达性分析（Reachability Analysis）</a></li>
+</ul>
+</div>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>前面了解了Java内存运行时区域的各个部分，其中程序计数器、虚拟机栈、本地方法栈3个区域随线程而生，随线程而灭，栈
+中的栈帧随着方法的进入和退出而有条不紊地执行着出栈和入栈操作。每一个栈帧中分配多少内存基
+本上是在类结构确定下来时就已知的，因此这几个区域的内存分配和回收都具备确定性，
+在这几个区域内就不需要过多考虑如何回收的问题，当方法结束或者线程结束时，内存自然就跟随着
+回收了。</p>
+</div>
+<div class="paragraph">
+<p>但是`堆` 和`方法区`则有着很显著的不确定性：一个接口的多个实现类需要的内存可能不一样，一个方法所执行的不同条件，
+只有处于运行期我们才能知道程序究竟会创建哪些对象，这部分内存的分配和回收是动态的。</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1">说起垃圾收集我们需要考虑三个问题</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>哪些内存需要回收？</p>
+</li>
+<li>
+<p>什么时候回收？</p>
+</li>
+<li>
+<p>如何回收？</p>
+</li>
+</ol>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_引用计算算法reference_counting"><a class="anchor" href="#_引用计算算法reference_counting"></a>1. 引用计算算法（Reference Counting）</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>对每个对象的引用进行计数，每当有一个地方引用它时计数器 +1、引用失效则 -1，引用的计数放到对象头中，大于 0 的对象被认为是存活对象。
+在Java领域，至少主流的Java虚拟机里面都没有选用引用计数算法来管理内存，主要原因是，这个看似简单的算法有很多例外情况要考虑，必须要配合大量额外处理才能保证正确地工作，譬如单纯的引用计数就很难解决对象之间相互循环引用的问题。
+循环引用的问题可通过 Recycler 算法解决，但是在多线程环境下，引用计数变更也要进行昂贵的同步操作，性能较低，早期的编程语言会采用此算法。</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_可达性分析reachability_analysis"><a class="anchor" href="#_可达性分析reachability_analysis"></a>2. 可达性分析（Reachability Analysis）</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>这个算法的基本思路就是通过
+一系列称为“GC Roots”的根对象作为起始节点集，从这些节点开始，根据引用关系向下搜索，搜索过
+程所走过的路径称为“引用链”（Reference Chain），如果某个对象到GC Roots间没有任何引用链相连，
+或者用图论的话来说就是从GC Roots到这个对象不可达时，则证明此对象是不可能再被使用的</p>
+</div>
+<div class="paragraph">
+<p>如图下图所示，对象object 5、object 6、object 7虽然互有关联，但是它们到GC Roots是不可达的，
+因此它们将会被判定为可回收的对象。</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/roots.png" alt="roots">
+</div>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1">在Java技术体系里面，固定可作为GC Roots的对象包括以下几种</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>在虚拟机栈（栈帧中的本地变量表）中引用的对象，譬如各个线程被调用的方法堆栈中使用到的
+参数、局部变量、临时变量等。</p>
+</li>
+<li>
+<p>在方法区中类静态属性引用的对象，譬如Java类的引用类型静态变量。</p>
+</li>
+<li>
+<p>在方法区中常量引用的对象，譬如字符串常量池（String Table）里的引用。</p>
+</li>
+<li>
+<p>在本地方法栈中JNI（即通常所说的Native方法）引用的对象。</p>
+</li>
+<li>
+<p>Java虚拟机内部的引用，如基本数据类型对应的Class对象，一些常驻的异常对象（比如
+NullPointExcepiton、OutOfMemoryError）等，还有系统类加载器。</p>
+</li>
+<li>
+<p>所有被同步锁（synchronized关键字）持有的对象。</p>
+</li>
+<li>
+<p>反映Java虚拟机内部情况的JMXBean、JVMTI中注册的回调、本地代码缓存等。</p>
+</li>
+</ol>
+</div>
+</dd>
+<dt class="hdlist1">在可达性分析算法中判定为不可达的对象，也不是“非死不可”的，这时候它们暂时还处于“缓刑”阶段。要真正宣告一个对象死亡，至少要经历两次标记过程</dt>
+<dd>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>对象在进行可达性分析后发现没有与GC Roots相连接的引用链，那它将会被第一次标记,</p>
+</li>
+<li>
+<p>判断是否需要筛选，筛选的条件是此对象是否有必要执行finalize()方法。假如对象没有覆盖finalize()方法，或者finalize()方法已经被虚拟机调用
+过，那么虚拟机将这两种情况都视为“没有必要执行”。翻译成代码：</p>
+<div class="literalblock">
+<div class="content">
+<pre> ----
+if(对象没有覆盖finalize()方法 || finalize()方法已经被虚拟机调用过){
+     //没有必要执行finalize();
+}else{
+    //对象进入 F-Queue......
+}
+ ----</pre>
+</div>
+</div>
+</li>
+<li>
+<p>如果这个对象被判定为有必要执行finalize()方法，那么该对象将会被放置在一个名为F-Queue队列中，
+然后虚拟机自动建立低调度优先级的Finalizer线程去执行他们的finalize()方法。（触发其开始运行，但并不承诺一定会等待它运行结束，如果某个对象的finalize()方法执行缓慢，或者更极端地发生了死循环，将很可能导
+致F-Queue队列中的其他对象永久处于等待，甚至导致整个内存回收子系统的崩溃）</p>
+</li>
+<li>
+<p>第二次标记：收集器将对F-Queue中的对象进行第二次小规模的标记。如果对
+象要在finalize()中成功拯救自己——只要重新与引用链上的任何一个对象建立关联即可，譬如把自己
+（this关键字）赋值给某个类变量或者对象的成员变量，那在第二次标记时它将被移出“即将回收”的集
+合；如果对象这时候还没有逃脱，那基本上它就真的要被回收了。</p>
+</li>
+</ol>
+</div>
+</dd>
+</dl>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="rouge highlight"><code data-lang="java"><span class="nc">Unresolved</span> <span class="n">directive</span> <span class="n">in</span> <span class="n">uselessObject</span><span class="o">.</span><span class="na">adoc</span> <span class="o">-</span> <span class="nl">include:</span><span class="o">:/</span><span class="n">home</span><span class="o">/</span><span class="n">runner</span><span class="o">/</span><span class="n">work</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">java</span><span class="o">/</span><span class="n">com</span><span class="o">/</span><span class="n">diguage</span><span class="o">/</span><span class="n">truman</span><span class="o">/</span><span class="n">com</span><span class="o">/</span><span class="n">jinkun</span><span class="o">/</span><span class="n">jvm</span><span class="o">/</span><span class="n">notes</span><span class="o">/</span><span class="nc">FinalizeEscapeGC</span><span class="o">.</span><span class="na">java</span><span class="o">[]</span></code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>运行结果：
+finalize method executed!
+yes, i am still alive :
+no, i am dead :(</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2020-12-13 15:00:40 UTC
+</div>
+</div>
+</body>
+</html>
