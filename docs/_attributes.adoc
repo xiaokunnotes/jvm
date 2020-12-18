@@ -1,5 +1,5 @@
 ifndef::sourcedir[]
-:sourcedir: ../src/main/java/com/diguage/truman
+:sourcedir: ../../src/main/java/com/jinkun/jvm/notes
 endif::[]
 
 ifndef::diagram_attr[]

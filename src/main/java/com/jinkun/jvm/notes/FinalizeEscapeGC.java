@@ -29,9 +29,9 @@ public class FinalizeEscapeGC {
     // 因为Finalizer方法优先级很低，暂停0.5秒，以等待它
     Thread.sleep(500);
     if (SAVE_HOOK != null) {
-      System.out.println("yes, i am still alive :");
+      System.out.println("yes, i am still alive :"+SAVE_HOOK);
     } else {
-      System.out.println("no, i am dead :(");
+      System.out.println("no, i am dead :"+SAVE_HOOK);
     }
   }
 
