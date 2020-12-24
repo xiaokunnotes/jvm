@@ -27,6 +27,8 @@
 <li><a href="#_复制算法copying">4. 复制算法(Copying)</a></li>
 <li><a href="#_标记压缩法mark_compact">5. 标记压缩法（Mark-Compact）</a></li>
 <li><a href="#_分代收集理论分代算法generational_collectiong">6. 分代收集理论&#8212;&#8203;分代算法（Generational Collectiong）</a></li>
+<li><a href="#_写屏障">7. 写屏障</a></li>
+<li><a href="#_伪共享">8. 伪共享</a></li>
 </ul>
 </div>
 </div>
@@ -299,36 +301,89 @@ no, i am dead :(</pre>
 </ol>
 </div>
 <div class="paragraph">
-<p>但是这样会产生一个问题，年轻代中发生minor gc的频率很高，经常会扫描年轻代中的对象进行标记，如果老年代中有对象引用了年轻代中的对象，那岂不是每次进行minor gc时也要进行全堆的扫描？所以为了支持高频率的新生代回收，虚拟机会使用一种叫做卡表的数据结构来记录老年代引用新生代的关系。</p>
+<p>但是这样会产生一个问题，年轻代中发生minor gc的频率很高，经常会扫描年轻代中的对象进行标记，如果老年代中有对象引用了年轻代中的对象，那岂不是每次进行minor gc时也要进行全堆的扫描？所以为了支持高频率的新生代回收，同时又避免把整个来年代加进GC Roots扫描范围，虚拟机会使用一种叫做卡表的数据结构来记录老年代引用新生代的关系。</p>
 </div>
 <div class="ulist">
 <ul>
 <li>
-<p>卡表</p>
+<p>记忆集&#8212;&#8203;卡表</p>
 </li>
 </ul>
 </div>
 <div class="paragraph">
-<p>以Hotspot虚拟机为例，卡表的设计，是将整个堆空间分割成一个个卡页（card page），HotSpot虚拟机的每个卡页大小为512字节（其他虚拟机也基本都为2的n次幂），而卡表本事为一个简单的字节数组，记录当前对应卡页的标记值。当判断一个卡页中有存在对象的夸代引用时，将这个页标记为脏页，在进行 Minor GC 的时候，我们便可以不用扫描整个老年代，而是在卡表中寻找脏卡，并将脏卡中的对象加入到 Minor GC 的 GC Roots 里。当完成所有脏卡的扫描之后，Java 虚拟机便会将所有脏卡的标识位清零。</p>
+<p>为解决对象跨代引用所带来的问题，垃圾收集器在新生代中建立了名为记忆集的数据结构。用于避免把整个老年代加进GC Roots扫描范围。</p>
+</div>
+<div class="paragraph">
+<p><code>记忆集</code> 是一种用于记录从非收集区域指向收集区域的指针集合的抽象数据结构。</p>
+</div>
+<div class="paragraph">
+<p><code>卡表</code> 卡表就是记忆集的一种具体实现（可以理解为hashMap与Map的关系），卡表是一个比特位集合，它定义了记忆集的记录精度、与堆内存的映射关系。每一个比特位可以用来表示老年代的某一区域中所有对象是否持有新生代对象的引用。这样在新生代GC时可以不用花大量时间扫描所有的老年代对象来确定每一个对象的引用关系，可以先扫码卡表
+只有当卡表的标记位为1时，才需要扫码给定区域的老年代对象，而卡表为0的老年代对象，一定不含有新生代对象的引用。</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="./../images/cardTable.png" alt="cardTable">
+</div>
+</div>
+<div class="paragraph">
+<p>以Hotspot虚拟机为例，卡表的设计，是将整个堆空间分割成一个个卡页（card page），每个卡页大小为512字节（其他虚拟机也基本都为2的n次幂），而卡表本事为一个简单的字节数组，记录当前对应卡页的标记值。当判断一个卡页中有存在对象的夸代引用时，将这个页标记为脏页，在进行 Minor GC 的时候，我们便可以不用扫描整个老年代，而是在卡表中寻找脏卡，并将脏卡中的对象加入到 Minor GC 的 GC Roots 里。当完成所有脏卡的扫描之后，Java 虚拟机便会将所有脏卡的标识位清零。</p>
 </div>
 <div class="imageblock">
 <div class="content">
 <img src="./../images/card.png" alt="card">
 </div>
 </div>
-<div class="olist loweralpha">
-<ol class="loweralpha" type="a">
-<li>
-<p>那么卡表是在何时进行写标记值呢？</p>
-</li>
-</ol>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_写屏障"><a class="anchor" href="#_写屏障"></a>7. 写屏障</h2>
+<div class="sectionbody">
+<div class="literalblock">
+<div class="content">
+<pre>  我们已经解决了如何使用记忆集来缩减GC Roots扫描范围的问题，但还没有解决卡表元素如何维护的问题，例如它们何时变脏、谁来把它们变脏等？
+  卡表元素何时变脏的答案是很明确的——有其他分代区域中对象引用了本区域对象时，其对应的卡表元素就应该变脏，变脏时间点原则上应该发生在引用类型字段赋值的那一刻。但问题是如何变
+脏，即如何在对象赋值的那一刻去更新维护卡表呢？</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>写屏障可以看作在虚拟机层面对“引用类型字段赋值”这个动作的AOP切面，在引用对象赋值时会产生一个环形通知，供程序执行额外的动作，也就是说赋值的
+前后都在写屏障的覆盖范畴内。在赋值前的部分的写屏障叫作写前屏障，在赋值后的则叫作写后屏障。G1收集器出现之前其他收集器都只用到了写后屏障。</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>void oop_field_store(oop* field, oop new_value) {
+// 引用字段赋值操作
+*field = new_value;
+// 写后屏障，在这里完成卡表状态更新
+post_write_barrier(field, new_value);
+}</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_伪共享"><a class="anchor" href="#_伪共享"></a>8. 伪共享</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>除了写屏障的开销外，卡表在高并发场景下还面临着“伪共享”（False Sharing）问题。伪共享是处理并发底层细节时一种经常需要考虑的问题，现代中央处理器的缓存系统中是以缓存行（Cache Line） 为单位存储的，当多线程修改互相独立的变量时，如果这些变量恰好共享同一个缓存行，就会彼此影响（写回、无效化或者同步）而导致性能降低，这就是伪共享问题。</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>假设处理器的缓存行大小为64字节，由于一个卡表元素占1个字节，64个卡表元素将共享同一个缓存行。这64个卡表元素对应的卡页总的内存为32KB（64×512字节），也就是说如果不同线程更新的对象正好处于这32KB的内存区域内，就会导致更新卡表时正好写入同一个缓存行而影响性能</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>解决方案：一种简单的解决方案是不采用无条件的写屏障，而是先检查卡表标记，只有当该卡表元素未被标记过时才将其标记为变脏;</p>
+</div>
+<div class="paragraph">
+<p>在JDK 7之后，HotSpot虚拟机增加了一个新的参数-XX：+UseCondCardMark，用来决定是否开启卡表更新的条件判断。开启会增加一次额外判断的开销，但能够避免伪共享问题，两者各有性能损耗，是否打开要根据应用实际运行情况来进行测试权衡。</p>
 </div>
 </div>
 </div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2020-12-18 11:54:33 UTC
+Last updated 2020-12-24 09:50:26 UTC
 </div>
 </div>
 </body>
