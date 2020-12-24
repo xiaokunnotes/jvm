@@ -5,3 +5,5 @@
 :pdf-fontsdir: {asciidoctorconfigdir}/../cfg/fonts
 :pdf-stylesdir: {asciidoctorconfigdir}/../cfg/theme
 :pdf-theme: Source
+
+:sourcedir:  {asciidoctorconfigdir}/../src/main/java/com/jinkun/jvm/notes

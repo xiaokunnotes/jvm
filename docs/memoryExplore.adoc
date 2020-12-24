@@ -1,6 +1,6 @@
 = 第二部分 自动内存管理实践
 
-image::../images/runing.png[]
+image::images/runing.png[]
 
 == 程序计数器（Program Counter Register）
 

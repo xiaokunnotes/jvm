@@ -13,11 +13,11 @@ include::preface.adoc[leveloffset=+1]
 
 :sectnums:
 
-include::momoryManage/memoryExplore.adoc[leveloffset=+1]
+include::memoryExplore.adoc[leveloffset=+1]
 
-include::momoryManage/memoryStructure.adoc[leveloffset=+1]
+include::memoryStructure.adoc[leveloffset=+1]
 
-include::momoryManage/uselessObject.adoc[leveloffset=+1]
+include::uselessObject.adoc[leveloffset=+1]
 
 
 
