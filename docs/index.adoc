@@ -19,5 +19,7 @@ include::memoryStructure.adoc[leveloffset=+1]
 
 include::uselessObject.adoc[leveloffset=+1]
 
+include::G1.adoc[leveloffset=+1]
+
 
 

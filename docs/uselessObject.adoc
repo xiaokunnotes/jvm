@@ -100,7 +100,7 @@ image::images/fuzhisuanfa.png[]
 
 在java的新生代串行垃圾回收器中使用了复制算法的思想，新生代分为eden空间、from空间和to空间3个部分。其中from和to空间可视为用于复制的两块大小相同、地位相等且可进行角色互换的空间快。如下图
 
-image::../images/fzsf.png[]
+image::images/fzsf.png[]
 
 == 标记压缩法（Mark-Compact）
 
