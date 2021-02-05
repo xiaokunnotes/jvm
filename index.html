@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="generator" content="Asciidoctor 2.0.12">
 <meta name="keywords" content="Java,JDK,Java source,Collection,ArrayList,Map,List,HashMap,ArrayDeque,Deque,Set,HashSet,LinkedList,Queue,TreeMap,TreeSet,Vector,Stack">
-<meta name="author" content="2021-01-22">
+<meta name="author" content="2021-02-05">
 <meta name="copyright" content="Apache-2.0">
 <title>深入理解JVM虚拟机</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,400,400italic,600,600italic%7CNoto+Serif:400,400italic,700,700italic%7CDroid+Sans+Mono:400,700">
@@ -18,7 +18,7 @@
 <div id="header">
 <h1>深入理解JVM虚拟机</h1>
 <div class="details">
-<span id="author" class="author">2021-01-22</span><br>
+<span id="author" class="author">2021-02-05</span><br>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -722,6 +722,11 @@ post_write_barrier(field, new_value);
 <pre>开启选项：-XX:+UseG1GC</pre>
 </div>
 </div>
+<div class="imageblock">
+<div class="content">
+<img src="./images/g1All.png" alt="g1All">
+</div>
+</div>
 <div class="sect3">
 <h4 id="_分区"><a class="anchor" href="#_分区"></a>3.9.1. 分区</h4>
 <div class="paragraph">
@@ -729,10 +734,34 @@ post_write_barrier(field, new_value);
 </div>
 <div class="paragraph">
 <p>Region中还有一类特殊的Humongous区域，专门用来存储大对象。G1认为只要大小超过了一个
-Region容量一半的对象即可判定为大对象。每个Region的大小可以通过参数-XX：G1HeapRegionSize设
-定，取值范围为1MB～32MB，且应为2的N次幂。而对于那些超过了整个Region容量的超级大对象，
-将会被存放在N个连续的Humongous Region之中，G1的大多数行为都把Humongous Region作为老年代
-的一部分来进行看待</p>
+Region容量一半的对象即可判定为大对象。而对于那些超过了整个Region容量的超级大对象，
+将会被存放在N个连续的Humongous Region之中，有时候不得不先启动FullGC，
+G1的大多数行为都把Humongous Region作为老年代，</p>
+</div>
+<div class="paragraph">
+<p>H区有以下几个特点：</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>每个H Object会放在1个或者多个连续的Region里。</p>
+</li>
+<li>
+<p>直接分配到了老年代，防止反复拷贝移动</p>
+</li>
+<li>
+<p>在YGC、并发标记阶段、cleanup和FGC阶段回收</p>
+</li>
+<li>
+<p>在分配H Object之前先检查是否超过了 initiating heap occupancy percent （由参数-XX:InitiatingHeapOccupancyPercent控制）
+和the marking threshold 如果超过的话就启动并发收集周期，为的是提早回收，防止Evacuation Failure 和 Full GC。</p>
+</li>
+</ul>
+</div>
+<div class="sect4">
+<h5 id="_为什么要有h区"><a class="anchor" href="#_为什么要有h区"></a>为什么要有H区？</h5>
+<div class="paragraph">
+<p>G1做了一个优化：通过查看所有根对象以及年轻代分区的RSet，如果确定RSet中巨型对象没有任何引用，则说明G1发现了一个不可达的巨型对象，该对象分区会被回收。</p>
 </div>
 <div class="imageblock">
 <div class="content">
@@ -740,8 +769,80 @@ Region容量一半的对象即可判定为大对象。每个Region的大小可�
 </div>
 </div>
 </div>
+</div>
 <div class="sect3">
-<h4 id="_卡片"><a class="anchor" href="#_卡片"></a>3.9.2. 卡片</h4>
+<h4 id="_堆空间"><a class="anchor" href="#_堆空间"></a>3.9.2. 堆空间</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>G1 同样可以通过 -Xms/-Xmx 来指定堆空间大小</p>
+</li>
+<li>
+<p>当发生YGC 和 Mixed GC时，通过计算GC与应用的耗费时间比，自动调整堆空间大小。</p>
+</li>
+<li>
+<p>如果GC频率太高可以增加堆空间大小降低GC频率</p>
+<div class="ulist">
+<ul>
+<li>
+<p>目标参数-XX:GCTimeRatio即为GC与应用的耗费时间比：G1默认为12（JDK7,8为99，JDK11+开始为12）</p>
+</li>
+<li>
+<p>通过-XX:GCTimeRatio=&lt;value&gt;我们告诉JVM吞吐量要达到的目标值。 更准确地说，-XX:GCTimeRatio=N指定目标应用程序线程的执行时间(与总的程序执行时间)达到N/(N+1)的目标比值。 例如，通过-XX:GCTimeRatio=9我们要求应用程序线程在整个执行时间中至少9/10是活动的(因此，GC线程占用其余1/10)。 基于运行时的测量，JVM将会尝试修改堆和GC设置以期达到目标吞吐量。 -XX:GCTimeRatio的默认值是99，也就是说，应用程序线程应该运行至少99%的总执行时间。</p>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_分代"><a class="anchor" href="#_分代"></a>3.9.3. 分代</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>而无需整堆扫描，避免长命对象的拷贝，同时独立收集有助于降低响应时间。</p>
+</li>
+<li>
+<p>G1将内存在逻辑上划分为年轻代和老年代</p>
+</li>
+<li>
+<p>但年轻代空间并不是固定不变的，当现有年轻代分区占满时，JVM会分配新的空闲分区加入到年轻代空间。</p>
+</li>
+<li>
+<p>整个年轻代内存会在初始空间-XX:NewSize与最大空间-XX:MaxNewSize之间动态变化，且由参数目标暂停时间-XX:MaxGCPauseMillis、需要扩缩容的大小以及分区的已记忆集合(RSet)计算得到</p>
+<div class="ulist">
+<ul>
+<li>
+<p>当然，G1依然可以设置固定的年轻代大小(参数-XX:NewRatio、-Xmn)，但同时暂停目标将失去意义</p>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_本地分配缓冲区"><a class="anchor" href="#_本地分配缓冲区"></a>3.9.4. 本地分配缓冲区</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>LAB(Local allocation buffer): 每个线程均可以“认领”某个分区用于线程本地的内存分配，不需要顾及分区是否连续。</p>
+</li>
+<li>
+<p>TLAB(Thread Local allocation buffer) 应用线程可以独占的本地缓冲区</p>
+</li>
+<li>
+<p>GCLAB(GC Local allocation buffer) 每次垃圾收集时，每个GC线程同样也可以占用一个本地缓存区用来转移对象，每次转移对象都会将对象复制到s区</p>
+</li>
+<li>
+<p>PLAB(Promotion Local allocation buffer) 对于从Eden/Survivor空间晋升到s/o 空间的对象，同样有GC独占的本地缓冲区进行操作。</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_卡片"><a class="anchor" href="#_卡片"></a>3.9.5. 卡片</h4>
 <div class="paragraph">
 <p>在每个分区内部又被分成了若干个大小为512 Byte卡片，标识堆内存最小可用粒度。所有分区的卡片将会记录在全局卡片表(Global Card Table)中，分配的对象会占用物理上连续的若干个卡片，当查找对分区内对象的引用时便可通过记录卡片来查找该引用对象(见RSet)。每次对内存的回收，都是对指定分区的卡片进行处理。</p>
 </div>
@@ -830,16 +931,104 @@ G1收集器也要被迫冻结用户线程执行，导致Full GC而产生长时�
 </div>
 <div class="sect4">
 <h5 id="_数据结构"><a class="anchor" href="#_数据结构"></a>数据结构</h5>
+
+</div>
+</div>
+<div class="sect3">
+<h4 id="_rset_remember_set已记忆集合"><a class="anchor" href="#_rset_remember_set已记忆集合"></a>3.9.6. Rset （Remember Set，已记忆集合)</h4>
+<div class="paragraph">
+<p>RSet记录了其他Region中的对象引用本Region中对象的关系. RSet的价值在于使得垃圾收集器不需要扫描整个堆找到谁引用了当前分区中的对象，只需要扫描RSet即可. 堆内存中的每个region都有一个RSet. RSet 使heap区能并行独立地进行垃圾集合. RSets的总体影响小于5%.</p>
+</div>
 <div class="ulist">
 <ul>
 <li>
-<p><strong>Remembered Sets</strong> 简称 RSets. RSet记录了其他Region中的对象引用本Region中对象的关系. RSet的价值在于使得垃圾收集器不需要扫描整个堆找到谁引用了当前分区中的对象，只需要扫描RSet即可. 堆内存中的每个region都有一个RSet. RSet 使heap区能并行独立地进行垃圾集合. RSets的总体影响小于5%.</p>
+<p>G1为了避免STW式的整堆扫描，在每个分区记录了一个记忆集合（Rset）,内部类似于一个反向指针，记录引用分区内对象的卡片card索引</p>
 </li>
 <li>
-<p><strong>Collection Sets</strong> 简称 CSets. 收集集合,一组可被回收的分区的集合。在CSet中存活的数据会在GC过程中被移动到另一个可用分区，CSet中的分区可以来自Eden空间、survivor空间、或者老年代。CSet会占用不到整个堆空间的1%大小</p>
+<p>当要回收该分区region时，通过扫描分区的Rset，来确定引用本分区内的对象是否存活，进而确定本分区内的对象存活情况</p>
 </li>
 <li>
-<p><strong>SATB算法</strong> 快照标记算法</p>
+<p>只有老年代分区会记录Rset记录。</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_prtper_region_table"><a class="anchor" href="#_prtper_region_table"></a>3.9.7. PRT(Per Region Table)</h4>
+<div class="paragraph">
+<p>RSet在内部使用Per Region Table(PRT)记录分区Region的引用情况。
+由于RSet的记录要占用分区Region的空间，如果一个分区非常"受欢迎"，那么RSet占用的空间会上升，从而降低分区Region的可用空间。
+G1应对这个问题采用了改变RSet的密度的方式，在PRT中将会以三种模式记录引用：</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>稀少：直接记录引用对象的卡片Card的索引</p>
+</li>
+<li>
+<p>细粒度：记录引用对象的分区Region的索引</p>
+</li>
+<li>
+<p>粗粒度：只记录引用情况，每个分区对应一个比特位</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>由上可知，粗粒度的PRT只是记录了引用数量，需要通过整堆Heap扫描才能找出所有引用，因此扫描速度也是最慢的。</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_collection_sets_简称_csets"><a class="anchor" href="#_collection_sets_简称_csets"></a>3.9.8. Collection Sets* 简称 CSets.</h4>
+<div class="paragraph">
+<p>收集集合,一组可被回收的分区的集合。在CSet中存活的数据会在GC过程中被移动到另一个可用分区，CSet中的分区可以来自Eden空间、survivor空间、或者老年代。CSet会占用不到整个堆空间的1%大小</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>收集集合(CSet)代表每次GC暂停时回收的一系列目标分区Region</p>
+</li>
+<li>
+<p>年轻代手机（YGC）的CSet只容纳年轻代分区，而混合收集（Mixed GC）会通过启发式算法，在老年代候选回收分区中，筛选出回收收益最高的分区添加到CSet中</p>
+<div class="ulist">
+<ul>
+<li>
+<p>候选老年代分区的CSet准入条件，可以通过活跃度阈值-XX:G1MixedGCLiveThresholdPercent(默认85%)进行设置，从而拦截那些回收开销巨大的对象；</p>
+</li>
+<li>
+<p>同时，每次混合收集可以包含候选老年代分区，可根据CSet对堆的总大小占比-XX:G1OldCSetRegionThresholdPercent(默认10%)设置数量上限。</p>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_年轻代收集集合_cset_of_young_collection"><a class="anchor" href="#_年轻代收集集合_cset_of_young_collection"></a>3.9.9. 年轻代收集集合 CSet of Young Collection</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>应用线程不断活动后，年轻代空间会被逐渐填满。当JVM分配对象到Eden区域失败(Eden区已满)时，便会触发一次STW式的年轻代收集。</p>
+</li>
+<li>
+<p>在年轻代收集中，Eden分区存活的对象将被拷贝到Survivor分区；
+原有Survivor分区存活的对象，将根据任期阈值(tenuring threshold)分别晋升到PLAB中，新的survivor分区和老年代分区。而原有的年轻代分区将被整体回收掉。</p>
+</li>
+<li>
+<p>年轻代收集还负责维护对象的年龄(存活次数)，辅助判断老化(tenuring)对象晋升的时候是到Survivor分区还是到老年代分区。</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_混合收集集合_cset_of_mixed_collection"><a class="anchor" href="#_混合收集集合_cset_of_mixed_collection"></a>3.9.10. 混合收集集合 CSet of Mixed Collection</h4>
+<div class="ulist">
+<ul>
+<li>
+<p>当老年代占用空间超过整堆比IHOP阈值-XX:InitiatingHeapOccupancyPercent(老年代占整堆比，默认45%)时，G1就会启动一次混合垃圾收集周期。</p>
+</li>
+<li>
+<p>首先经理并发标记周期，识别出高收益的老年代分区。</p>
 </li>
 </ul>
 </div>
@@ -878,6 +1067,95 @@ Region的全部空间。这里的操作涉及存活对象的移动，是必须�
 <img src="./images/g1Running.png" alt="g1Running">
 </div>
 </div>
+</div>
+<div class="sect3">
+<h4 id="_gc日志"><a class="anchor" href="#_gc日志"></a>3.9.11. GC日志</h4>
+<div class="paragraph">
+<p>并发标记周期 Concurrent Marking Cycle</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>[GC concurrent-root-region-scan-start]
+[GC concurrent-root-region-scan-end, 0.0094252 secs]
+# 根分区扫描，可能会被 YGC 打断，那么结束就是如：[GC pause (G1 Evacuation Pause) (young)[GC concurrent-root-region-scan-end, 0.0007157 secs]
+[GC concurrent-mark-start]
+[GC concurrent-mark-end, 0.0203881 secs]
+# 并发标记阶段
+[GC remark [Finalize Marking, 0.0007822 secs] [GC ref-proc, 0.0005279 secs] [Unloading, 0.0013783 secs], 0.0036513 secs]
+#  重新标记，STW
+ [Times: user=0.01 sys=0.00, real=0.00 secs]
+[GC cleanup 13985K-&gt;13985K(20480K), 0.0034675 secs]
+ [Times: user=0.00 sys=0.00, real=0.00 secs]
+# 清除</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>年轻代收集 YGC</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>[GC pause (G1 Evacuation Pause) (young), 0.0022483 secs]
+# young -&gt; 年轻代      Evacuation-&gt; 复制存活对象
+   [Parallel Time: 1.0 ms, GC Workers: 10] # 并发执行的GC线程数，以下阶段是并发执行的
+      [GC Worker Start (ms): Min: 109.0, Avg: 109.1, Max: 109.1, Diff: 0.2]
+      [Ext Root Scanning (ms): Min: 0.1, Avg: 0.2, Max: 0.3, Diff: 0.2, Sum: 2.3] # 外部根分区扫描
+      [Update RS (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0] # 更新已记忆集合 Update RSet，检测从年轻代指向老年代的对象
+         [Processed Buffers: Min: 0, Avg: 0.0, Max: 0, Diff: 0, Sum: 0]
+      [Scan RS (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]# RSet扫描
+      [Code Root Scanning (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.1] # 代码根扫描
+      [Object Copy (ms): Min: 0.3, Avg: 0.3, Max: 0.4, Diff: 0.1, Sum: 3.5] # 转移和回收，拷贝存活的对象到survivor/old区域
+      [Termination (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0] # 完成上述任务后，如果任务队列已空，则工作线程会发起终止要求。
+         [Termination Attempts: Min: 1, Avg: 5.8, Max: 9, Diff: 8, Sum: 58]
+      [GC Worker Other (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.1] # GC外部的并行活动，该部分并非GC的活动，而是JVM的活动导致占用了GC暂停时间(例如JNI编译)。
+      [GC Worker Total (ms): Min: 0.5, Avg: 0.6, Max: 0.7, Diff: 0.2, Sum: 5.9]
+      [GC Worker End (ms): Min: 109.7, Avg: 109.7, Max: 109.7, Diff: 0.0]
+   [Code Root Fixup: 0.0 ms] # 串行任务，根据转移对象更新代码根
+   [Code Root Purge: 0.0 ms] #串行任务， 代码根清理
+   [Clear CT: 0.5 ms] #串行任务，清除全局卡片 Card Table 标记
+   [Other: 0.8 ms]
+      [Choose CSet: 0.0 ms] # 选择下次收集集合  CSet
+      [Ref Proc: 0.4 ms] # 引用处理 Ref Proc，处理软引用、弱引用、虚引用、final引用、JNI引用
+      [Ref Enq: 0.0 ms] # 引用排队 Ref Enq
+      [Redirty Cards: 0.3 ms] # 卡片重新脏化 Redirty Cards：重新脏化卡片
+      [Humongous Register: 0.0 ms]
+      [Humongous Reclaim: 0.0 ms] # 回收空闲巨型分区 Humongous Reclaim，通过查看所有根对象以及年轻代分区的RSet，如果确定RSet中巨型对象没有任何引用，该对象分区会被回收。
+      [Free CSet: 0.0 ms]  # 释放分区 Free CSet
+   [Eden: 12288.0K(12288.0K)-&gt;0.0B(11264.0K) Survivors: 0.0B-&gt;1024.0K Heap: 12288.0K(20480.0K)-&gt;832.0K(20480.0K)]
+ [Times: user=0.01 sys=0.00, real=0.00 secs]</pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre># 从年轻代分区拷贝存活对象时，无法找到可用的空闲分区
+# 从老年代分区转移存活对象时，无法找到可用的空闲分区 这两种情况之一导致的 YGC
+[GC pause (G1 Evacuation Pause) (young) (to-space exhausted), 0.0916534 secs]</pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre># 并发标记周期 Concurrent Marking Cycle 中的 根分区扫描阶段，被 YGC中断
+[GC pause (G1 Evacuation Pause) (young)[GC concurrent-root-region-scan-end, 0.0007157 secs]</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>混合收集周期 Mixed Collection Cycle, Mixed GC</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre># 并发标记周期 Concurrent Marking Cycle 的开始
+[GC pause (G1 Evacuation Pause) (young) (initial-mark) , 0.0443460 secs]</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Full GC</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>[Full GC (Allocation Failure) 20480K-&gt;9656K(20480K), 0.0189481 secs]
+   [Eden: 0.0B(1024.0K)-&gt;0.0B(5120.0K) Survivors: 0.0B-&gt;0.0B Heap: 20480.0K(20480.0K)-&gt;9656.8K(20480.0K)], [Metaspace: 4960K-&gt;4954K(1056768K)]
+ [Times: user=0.03 sys=0.00, real=0.02 secs]</pre>
+</div>
+</div>
 <div class="paragraph">
 <p><strong>G1与CMS对比优势与劣势</strong></p>
 </div>
@@ -914,10 +1192,9 @@ Region的全部空间。这里的操作涉及存活对象的移动，是必须�
 </div>
 </div>
 </div>
-</div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2021-01-22 12:19:55 UTC
+Last updated 2021-02-05 11:35:15 UTC
 </div>
 </div>
 </body>
